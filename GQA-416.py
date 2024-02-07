@@ -1,93 +1,54 @@
-import re
-import string
-from flask_restful import Resource, reqparse
 
+from flask import jsonify, request
+from app.models import User
+from app.api import api_bp
+from app.api.utils import validate_json
 
+@api_bp.route('/login', methods=['POST'])
+def login():
+    """Login API endpoint.
 
-class Login(Resource):
-    ""
-    A class representing the login resource.
+    This function handles POST requests to the '/login' endpoint. It validates the JSON payload against a schema,
+    checks if the username already exists in the database, encrypts the password, and stores the username-password pair.
 
-    This class provides methods for validating and registering users. It handles requests to register new users or log existing users into their accounts.
+    Returns:
+        Response: A Flask Response object containing the result of the operation.
+    """
+    # Validate the JSON payload against the schema
+    validate_json(request.get_json(), 'login')
 
-    Attributes:
-        parser (reqparse.RequestParser): The request parser used for parsing incoming requests.
-        db (SQLAlchemy): The SQLAlchemy database object.
-    ""
+    # Get the username and password from the request body
+    username = request.json.get('username')
+    password = request.json.get('password')
 
-    def __init__(self, db=None):
-        ""
-        Initializes the login resource.
+    # Check if the username already exists in the database
+    if User.query.filter_by(username=username).first() is not None:
+        return jsonify({'error': 'User already exists.'}), 500
 
-        Args:
-            db (SQLAlchemy, optional): The SQLAlchemy database object. Defaults to None.
-        ""
-        self.parser = reqparse.RequestParser()
-        self.db = db
+    # Encrypt the password securely
+    encrypted_password = encrypt_password(password)
 
-    @staticmethod
-    def _validate_username(username):
-        ""
-        Validates the given username.
+    # Store the username-password pair in the database
+    user = User(username=username, password=encrypted_password)
+    db.session.add(user)
+    db.session.commit()
 
-        This method checks if the username contains invalid characters or exceeds the maximum allowed length.
+    return jsonify({'message': 'Successfully registered.'})
 
-        Args:
-            username (str): The username to validate.
+"""
+Explanation:
 
-        Returns:
-            bool: True if the username is valid; False otherwise.
-        ""
-        # TODO: Implement actual validation logic here
-        return True
+This is a Python script that defines a Flask route for handling login requests. The route uses the `validate_json` function to validate the JSON payload against a predefined schema.
 
-    @staticmethod
-    def _validate_password(password):
-        ""
-        Validates the given password.
+The function first retrieves the username and password from the request body using the `request.json.get()` method.
 
-        This method checks if the password contains invalid characters or does not meet the required length requirements.
+It then checks if the username already exists in the database by querying the `User` model using the `filter_by()` method and checking if the returned value is not None. If it does exist, it returns a JSON response with an error message and a 500 status code.
 
-        Args:
-            password (str): The password to validate.
+If the username does not exist, it encrypts the password using the `encrypt_password()` function (which is not defined in this snippet).
 
-        Returns:
-            bool: True if the password is valid; False otherwise.
-        ""
-        # TODO: Implement actual validation logic here
-        return True
+Finally, it creates a new `User` instance with the encrypted password and adds it to the database session using the `db.session.add()` method. It commits the changes to the database using the `db.session.commit()` method.
 
-    def post(self):
-        ""
-        Handles POST requests to register a new user.
+After committing the changes, it returns a JSON response with a success message and a 200 status code.
 
-        This method handles POST requests to register a new user by validating the provided username and password. If the username or password are invalid, it returns a bad request response. Otherwise, it creates a new user entry in the database and returns a success response.
-
-        Returns:
-            Response: The response containing the result of the operation.
-        ""
-        args = self.parser.parse_args()
-        username = args['username']
-        password = args['password']
-
-        if not self._validate_username(username) or not self._validate_password(password):
-            return {'message': 'Bad request'}, 400
-
-        user = User(username=username, password=password)
-        self.db.session.add(user)
-        self.db.session.commit()
-
-        return {'message': 'Success'}
-
-
-if __name__ == '__main__':
-    app = Flask(__name__)
-    api = Api(app)
-    db = SQLAlchemy(app)
-
-    class User(db.Model):
-        id = db.Column(db.Integer, primary_key=True)
-        username = db.Column(db.String(80), unique=True)
-        password = db.Column(db.String(128))
-
-    api.add_resource(Login, '/login')
+Note that this script assumes that you have already imported the necessary modules and defined the `User` model and `db` objects. Additionally, the `encrypt_password()` function is not included in this snippet.
+"""
