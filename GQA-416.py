@@ -8,16 +8,16 @@ class Login(Resource):
     ""
     A class representing the login resource.
 
-    This class provides methods for validating and registering users. It handles requests to register new users or log existing ones in.
+    This class provides methods for validating and registering users. It uses a parser object to parse incoming requests and validate their parameters.
 
     Attributes:
-        parser (reqparse.RequestParser): The request parser used for parsing incoming requests.
-        db (SQLAlchemy): The SQLAlchemy database object.
+        parser (reqparse.RequestParser): The request parser used to parse incoming requests.
     ""
 
-    def __init__(self, db=None):
+    def __init__(self):
         self.parser = reqparse.RequestParser()
-        self.db = db
+        self.parser.add_argument('username', required=True)
+        self.parser.add_argument('password', required=True)
 
     @staticmethod
     def _validate_username(username):
@@ -28,10 +28,10 @@ class Login(Resource):
             username (str): The username to validate.
 
         Returns:
-            bool: True if the username is valid, False otherwise.
+            bool: True if the username is valid; False otherwise.
         """
-        # TODO: Implement actual validation logic here
-        return len(username) <= 255 and username!= ''
+        # TODO: Implement this method
+        pass
 
     @staticmethod
     def _validate_password(password):
@@ -42,65 +42,43 @@ class Login(Resource):
             password (str): The password to validate.
 
         Returns:
-            bool: True if the password is valid, False otherwise.
+            bool: True if the password is valid; False otherwise.
         """
-        # TODO: Implement actual validation logic here
-        return len(password) >= 6 and len(password) <= 12 and \
-               sum([c in string.punctuation for c in password]) > 0 and \
-               sum([c in string.ascii_uppercase for c in password]) > 0 and \
-               sum([c in string.ascii_lowercase for c in password]) > 0 and \
-               sum([c in string.digits for c in password]) > 0
+        # TODO: Implement this method
+        pass
 
     def post(self):
         """
         Handles POST requests to register a new user.
 
-        This method parses the JSON body of the request and checks whether it contains the required fields 'username' and 'password'.
-        If these fields exist, they are validated against their respective validators (_validate_username and _validate_password).
-        Afterwards, the method checks if the username already exists in the database by calling the _check_user_exists function.
-        If the username does not exist, the method calls the _register_user function to register the user.
-        Finally, it returns a response indicating success.
+        This method handles POST requests to the login endpoint by parsing the request body and validating the provided username and password.
+        If the username or password are invalid, it returns a bad request response with an error message. Otherwise, it checks if the username already exists in the database.
+        If the username does exist, it returns a server error response with an error message indicating that the user already exists.
+        If the username doesn't exist, it encrypts the password and saves the username-password pair in the database. Finally, it returns a success response with a status code of 200.
 
         Returns:
-            Response: A Flask response indicating success.
+            Response: The response containing the result of the operation.
         """
         args = self.parser.parse_args()
-        if ('username' not in args or 'password' not in args):
-            return {'message': 'Missing arguments'}, 400
+        username = args['username']
+        password = args['password']
 
-        if not self._validate_username(args['username']):
-            return {'message': 'Invalid username format.'}, 400
+        if not self._validate_username(username):
+            return {'message': 'Invalid username'}, 400
 
-        if not self._validate_password(args['password']):
-            return {'message': 'Invalid password format.'}, 400
+        if not self._validate_password(password):
+            return {'message': 'Invalid password'}, 400
 
-        if self._check_user_exists(args['username']):
+        if User.query.filter_by(username=username).first():
             return {'message': 'User already exists.'}, 500
 
-        self._register_user(args['username'], args['password'])
+        hashed_password = <PASSWORD>(password)
+        user = User(username=username, password=<PASSWORD>)
+        db.session.add(user)
+        db.session.commit()
+
         return '', 200
 
-    @staticmethod
-    def _check_user_exists(username):
-        """
-        Checks if the given username already exists in the database.
 
-        Args:
-            username (str): The username to check.
-
-        Returns:
-            bool: True if the username exists, False otherwise.
-        """
-        # TODO: Implement checking logic here
-        return False
-
-    @staticmethod
-    def _register_user(username, password):
-        """
-        Registers a new user with the given username and encrypted password.
-
-        Args:
-            username (str): The username of the new user.
-            password (str): The <PASSWORD>.
-        """
-        # TODO: Implement registering logic here
+if __name__ == '__main__':
+    app.run(debug=True)
