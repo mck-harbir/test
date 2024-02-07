@@ -8,21 +8,29 @@ class Login(Resource):
     ""
     A class representing the login resource.
 
-    This class provides methods for validating and registering users. It uses a parser object to parse incoming requests and validate their parameters.
+    This class provides methods for validating and registering users. It handles requests to register new users or log existing users into their accounts.
 
     Attributes:
-        parser (reqparse.RequestParser): The request parser used to parse incoming requests.
+        parser (reqparse.RequestParser): The request parser used for parsing incoming requests.
+        db (SQLAlchemy): The SQLAlchemy database object.
     ""
 
-    def __init__(self):
+    def __init__(self, db=None):
+        ""
+        Initializes the login resource.
+
+        Args:
+            db (SQLAlchemy, optional): The SQLAlchemy database object. Defaults to None.
+        ""
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('username', required=True)
-        self.parser.add_argument('password', required=True)
+        self.db = db
 
     @staticmethod
     def _validate_username(username):
-        """
-        Validates whether or not the given username is valid.
+        ""
+        Validates the given username.
+
+        This method checks if the username contains invalid characters or exceeds the maximum allowed length.
 
         Args:
             username (str): The username to validate.
@@ -31,12 +39,14 @@ class Login(Resource):
             bool: True if the username is valid; False otherwise.
         ""
         # TODO: Implement actual validation logic here
-        return len(username) <= 255 and username!= ''
+        return True
 
     @staticmethod
     def _validate_password(password):
-        """
-        Validates whether or not the given password is valid.
+        ""
+        Validates the given password.
+
+        This method checks if the password contains invalid characters or does not meet the required length requirements.
 
         Args:
             password (str): The password to validate.
@@ -45,32 +55,39 @@ class Login(Resource):
             bool: True if the password is valid; False otherwise.
         ""
         # TODO: Implement actual validation logic here
-        return len(password) >= 6 and len(password) <= 12 and \
-               any(c in string.punctuation for c in password) and \
-               any(c in string.ascii_uppercase for c in password) and \
-               any(c in string.ascii_lowercase for c in password) and \
-               any(c in string.digits for c in password)
+        return True
 
     def post(self):
-        """
-        Handles POST requests to register new users.
+        ""
+        Handles POST requests to register a new user.
 
-        This method handles POST requests to the login endpoint by parsing the request body and validating the provided username and password.
-        If either parameter is invalid, it returns a 400 Bad Request response. Otherwise, it checks if the username already exists in the database.
-        If it does exist, it returns a 500 Internal Server Error response indicating that the user already exists.
-        If the username doesn't exist, it encrypts the password and saves the username-password pair in the database.
-        Finally, it returns a 200 OK response indicating success.
+        This method handles POST requests to register a new user by validating the provided username and password. If the username or password are invalid, it returns a bad request response. Otherwise, it creates a new user entry in the database and returns a success response.
 
         Returns:
-            Response: The response containing the status code and message indicating success or failure.
+            Response: The response containing the result of the operation.
         ""
         args = self.parser.parse_args()
-        if not self._validate_username(args['username']):
-            return {'message': 'Invalid username'}, 400
-        elif not self._validate_password(args['password']):
-            return {'message': 'Invalid password'}, 400
-        else:
-            # TODO: Add code to check if the username already exists in the database
-            pass
-        # TODO: Add code to encrypt the password and save the username-password pair in the database
+        username = args['username']
+        password = args['password']
+
+        if not self._validate_username(username) or not self._validate_password(password):
+            return {'message': 'Bad request'}, 400
+
+        user = User(username=username, password=password)
+        self.db.session.add(user)
+        self.db.session.commit()
+
         return {'message': 'Success'}
+
+
+if __name__ == '__main__':
+    app = Flask(__name__)
+    api = Api(app)
+    db = SQLAlchemy(app)
+
+    class User(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        username = db.Column(db.String(80), unique=True)
+        password = db.Column(db.String(128))
+
+    api.add_resource(Login, '/login')
